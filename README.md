@@ -1,8 +1,8 @@
 # BMFFGlitch
 
 BMFFGlitch enables you to destroy your files stored in ISO Base Media File Format(BMFF) and its relatives(such as MP4/MOV).
-BMFFGlitch makes use of BMFF library <https://github.com/zuku/bmff/> made by Takayuki OGISO, and is influenced by 
-AviGlitch <http://ucnv.github.io/aviglitch/> made by ucnv.
+BMFFGlitch makes use of [BMFF library](https://github.com/zuku/bmff/) made by Takayuki OGISO, and is influenced by 
+[AviGlitch](http://ucnv.github.io/aviglitch/) made by ucnv.
 
 ## Installation
 
