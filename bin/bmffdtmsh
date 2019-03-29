@@ -1,9 +1,6 @@
 #!/usr/bin/env ruby
 # -*- mode: ruby -*-
 
-$:.unshift './bmffglitch'
-$:.unshift './bmffglitch/lib'
-
 require 'optparse'
 require 'bmffglitch'
 
