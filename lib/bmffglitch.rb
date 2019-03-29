@@ -3,7 +3,7 @@ require 'bmffglitch/bmffex'
 require 'bmffglitch/base'
 require 'bmffglitch/sample'
 
-# BMFFGlitch: BMFFGlitch: A library to destroy your movies stored in ISO Base Media File Format(BMFF)
+# BMFFGlitch: A library to destroy your movies stored in ISO Base Media File Format(BMFF)
 #             and its relatives(such as MP4), like AviGlitch
 #
 # == Synopsis:
