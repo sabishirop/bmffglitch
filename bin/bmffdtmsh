@@ -1,0 +1,35 @@
+#!/usr/bin/env ruby
+# -*- mode: ruby -*-
+
+$:.unshift './bmffglitch'
+$:.unshift './bmffglitch/lib'
+
+require 'optparse'
+require 'bmffglitch'
+
+all = false
+ofn = './out.mp4'
+
+opts = OptionParser.new
+
+opts.banner = "bmffdtmsh - Datamoshing video generator using BMFFGlitch."
+opts.define_head("Usage: #{File.basename($0)} [options] <input_filename>")
+opts.separator("Options:")
+opts.on("-o", "--output [OUTPUT]", "Output the video to OUTPUT (./out.mp4 by default)") {|v| ofn = v }
+opts.on("-a", "--all", "Remove all keyframes (It remains a first keyframe by default)") {|v| all = true}
+opts.on_tail("-h", "--help", "Show this message") {|v|
+  puts opts
+  exit
+}
+
+opts.parse!(ARGV)
+
+if ARGV.length != 1
+  opts.banner = "You must specify one BMFF file.\n\n"
+  puts opts
+  exit 1
+end
+
+bmff = BMFFGlitch.open(ARGV[0])
+bmff.samples.delete_if {|sample| sample.is_syncsample? && (all || sample.sample_number != 1)}
+bmff.output(ofn)
