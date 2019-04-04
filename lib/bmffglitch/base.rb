@@ -6,6 +6,30 @@ module BMFFGlitch
       @io = File.open(path, 'rb') 
       @file_container = BMFF::FileContainer.parse(@io)
       @samples = get_samples(@file_container)
+      @is_faststart = nil
+    end
+
+    def is_faststart?
+      return @is_faststart if @is_faststart != nil
+
+      # get mdat.offset which has the smallest offset from the top of file.
+      box = @file_container.select_descendants("mdat")
+      if (box == nil || box.empty?)
+        raise "Media Data Box(mdat) is missing"
+      else 
+        first_mdat_offset = box.sort{|a,b| a.offset <=> b.offset }[0].offset
+      end
+
+      # get moov.offset
+      box = @file_container.select_descendants("moov")
+      if (box == nil || box.empty?)
+        raise "Movie Box(moov) is missing"
+      else
+        moov_offset = box[0].offset
+      end
+      @is_faststart = (first_mdat_offset > moov_offset) ? true : false
+
+      return @is_faststart
     end
     
     def get_samples(file_container)
@@ -112,31 +136,8 @@ module BMFFGlitch
       }
       return samples.sort {|a, b| a.file_offset <=> b.file_offset}
     end
-    
-    def update
-      box = @file_container.select_descendants("mdat")
-      if (box == nil || box.empty?)
-        raise "Media Data Box(mdat) is missing"
-      elsif (box.length > 2) # delete unnecessary mdat to ease re-calculate offset
-        box.sort{|a,b| a.offset <=> b.offset }[1..box.length].each {|mdat| @file_container.children.delete(mdat) }
-      end
-      mdat = box[0]
 
-      # data starts from mdat.offset + size(uint32) + type(uint32)
-      mdat_data_offset = mdat.offset + 4 + 4
-      
-      # re-calculate offset
-      # Because of the nature of sample-based glitch, we need to handle all samples individually.
-      # I dare to disassemble chunks and each chunk contains only one sample
-      @samples.each {|sample|
-        sample.chunk_offset = mdat_data_offset
-        sample.file_offset = sample.chunk_offset# file_offset and chunk_offset has the same value because each chunk has only one sample
-        
-        mdat_data_offset += sample.data.length
-      }
-      
-      mdat.raw_data = @samples.map {|sample| sample.data }.join
-      
+    def update_moov
       @file_container.select_descendants("trak").each do |trak|
         if !trak.select_descendants(BMFF::Box::VisualSampleEntry).empty?
           samples = @samples.find_all{|sample| sample.is_visualsample? }
@@ -280,6 +281,53 @@ module BMFFGlitch
         }
         stsc.entry_count = stsc.first_chunk.length
       end
+    end
+    
+    def update
+      moov_offset_change = 0
+      # if the file is faststart, moov box appears earlier than mdat, so we have to re-calculate the size of moov box to adjust
+      # the offset of mdat.
+      if is_faststart?
+        # get old moov
+        box = @file_container.select_descendants("moov")
+        if (box == nil || box.empty?)
+          raise "Movie Box(moov) is missing"
+        else
+          old_moov_size = box[0].to_s.size
+        end
+        
+        # update moov
+        update_moov
+
+        new_moov_size = box[0].to_s.size
+
+        moov_offset_change = new_moov_size - old_moov_size
+      end
+      
+      box = @file_container.select_descendants("mdat")
+      if (box == nil || box.empty?)
+        raise "Media Data Box(mdat) is missing"
+      elsif (box.length > 2) # delete unnecessary mdat to ease the re-calculation of offsets.
+        box.sort{|a,b| a.offset <=> b.offset }[1..box.length].each {|mdat| @file_container.children.delete(mdat) }
+      end
+      mdat = box[0]
+
+      # data starts from mdat.offset + size(uint32) + type(uint32) + moov_offset_change(if faststart)
+      mdat_data_offset = mdat.offset + 4 + 4 + moov_offset_change 
+      
+      # re-calculate offset
+      # Because of the nature of sample-based glitch, we need to handle all samples individually.
+      # I dare to disassemble chunks and each chunk contains only one sample
+      @samples.each {|sample|
+        sample.chunk_offset = mdat_data_offset
+        sample.file_offset = sample.chunk_offset# file_offset and chunk_offset has the same value because each chunk has only one sample
+        
+        mdat_data_offset += sample.data.length
+      }
+      
+      mdat.raw_data = @samples.map {|sample| sample.data }.join
+
+      update_moov
     end
 
     def output(path)

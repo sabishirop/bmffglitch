@@ -2,6 +2,7 @@ RSpec.describe BMFFGlitch do
   before :all do
     FileUtils.mkdir OUTPUT_DIR unless File.exist? OUTPUT_DIR
     @in = FILES_DIR + 'sample.mp4'
+    @in_faststart = FILES_DIR + 'sample_faststart.mp4'
     @out = OUTPUT_DIR + 'out.mp4'
   end
 
@@ -54,4 +55,28 @@ RSpec.describe BMFFGlitch do
       expect(sample.data).to eq ""
     }
   end
+
+  it "can check whether BMFF file is fast-start of not"  do
+    ibmff = BMFFGlitch.open(@in)
+    expect(ibmff.is_faststart?).to eq false
+
+    ifaststart_bmff = BMFFGlitch.open(@in_faststart)
+    expect(ifaststart_bmff.is_faststart?).to eq true
+  end
+
+  it "should handle fast-start BMFF file correctly"  do
+    ibmff = BMFFGlitch.open(@in_faststart)
+    ibmff.samples.delete_if {|sample| sample.is_syncsample? && sample.sample_number != 1}
+    ibmff_sample_data_list = ibmff.samples.map{|sample| sample.data}
+    ibmff.output(@out)
+
+    obmff = BMFFGlitch.open(@out)
+    syncsample_num = obmff.samples.find_all {|sample| sample.is_syncsample?}.length
+    expect(syncsample_num).to eq 1
+
+    obmff.samples.each_with_index{|sample, i|
+      expect(sample.data).to eq ibmff_sample_data_list[i]
+    }
+  end
+
 end
